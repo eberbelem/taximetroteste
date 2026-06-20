@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Taxímetro Digital · Inmetro</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #000000;
+    --surface: #0D0D0D;
+    --surface-light: #1A1A1A;
+    --card: #111111;
+    --card-border: #1F1F1F;
+    --fare: #39FF14;
+    --fare-dim: #2BBF0F;
+    --fare-cyan: #00F0FF;
+    --gold: #FFD700;
+    --orange: #FF5722;
+    --text: #FFFFFF;
+    --text-sec: #B0B0B0;
+    --text-ter: #707070;
+    --text-dim: #404040;
+    --divider: #1F1F1F;
+    --stop: #FF1744;
+    --start: #00E676;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  .app {
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 0 20px;
+    overflow: hidden;
+  }
+
+  /* ── Top Bar ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    padding: 12px 0 8px;
+    border-bottom: 1px solid var(--divider);
+    flex-shrink: 0;
+  }
+  .topbar .icon-taxi {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--card-border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    color: var(--gold);
+  }
+  .topbar .brand {
+    margin-left: 12px;
+  }
+  .topbar .brand h1 {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--text-sec);
+  }
+  .topbar .brand span {
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .topbar .right {
+    margin-left: auto;
+    display: flex; gap: 8px;
+  }
+  .topbar .gps-dot {
+    width: 32px; height: 32px;
+    border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid var(--card-border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .topbar .gps-dot.active { color: var(--fare); }
+  .topbar .gps-dot.inactive { color: var(--text-dim); }
+  .topbar .btn-icon {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--card-border);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 18px;
+    color: var(--text-sec);
+    transition: background .2s;
+  }
+  .topbar .btn-icon:hover { background: var(--surface-light); }
+
+  /* ── Scrollable Content ── */
+  .content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 20px 4px;
+    overflow: hidden;
+    min-height: 0;
+  }
+  .content > .spacer-1 { flex: 1; }
+  .content > .spacer-2 { flex: 2; }
+
+  /* ── Fare Display ── */
+  .fare-display {
+    text-align: center;
+    padding: 8px 0;
+  }
+  .fare-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    height: min(18vh, 120px);
+  }
+  .fare-currency {
+    font-size: min(4vw, 26px);
+    font-weight: 300;
+    padding-top: 14px;
+    color: var(--fare);
+  }
+  .fare-integer {
+    font-size: min(14vw, 92px);
+    font-weight: 200;
+    letter-spacing: 3px;
+    line-height: 1;
+    color: var(--fare);
+    transition: color .3s;
+  }
+  .fare-cents {
+    font-size: min(4vw, 26px);
+    font-weight: 300;
+    padding-top: 14px;
+    color: var(--fare);
+  }
+  .fare-display.idle .fare-currency,
+  .fare-display.idle .fare-integer,
+  .fare-display.idle .fare-cents {
+    color: var(--text-dim);
+  }
+  .fare-underline {
+    margin: 0 auto;
+    height: 3px;
+    border-radius: 2px;
+    transition: all .3s;
+  }
+  .fare-underline.idle { width: 120px; background: var(--text-dim); }
+  .fare-underline.active {
+    width: 240px;
+    background: var(--fare);
+    box-shadow: 0 0 12px rgba(57, 255, 20, 0.4);
+  }
+
+  /* ── Info Panel ── */
+  .info-panel {
+    display: flex;
+    align-items: center;
+    background: var(--surface);
+    border-radius: 16px;
+    border: 1px solid var(--card-border);
+    padding: 12px 16px;
+  }
+  .info-item {
+    flex: 1;
+    text-align: center;
+  }
+  .info-item .value {
+    font-size: min(3.5vw, 22px);
+    font-weight: 400;
+    letter-spacing: 0.5px;
+    color: var(--text);
+  }
+  .info-item .label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.8px;
+    color: var(--text-ter);
+    margin-top: 2px;
+  }
+  .info-divider {
+    width: 1px; height: 40px;
+    background: var(--divider);
+    flex-shrink: 0;
+  }
+
+  /* ── Status Bar ── */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    background: var(--surface);
+    border-radius: 12px;
+    border: 1px solid var(--card-border);
+    padding: 8px 14px;
+    margin-top: 6px;
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .status-dot.active {
+    background: var(--fare);
+    box-shadow: 0 0 8px rgba(57, 255, 20, 0.6);
+    animation: pulse 1.5s infinite;
+  }
+  .status-dot.idle { background: var(--text-dim); }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .4; }
+  }
+  .status-text {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 1.5px;
+    margin-left: 10px;
+  }
+  .status-text.active { color: var(--fare); }
+  .status-text.idle { color: var(--text-ter); }
+  .status-tariff {
+    margin-left: auto;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .status-tariff.t1 {
+    background: rgba(57, 255, 20, 0.15);
+    color: var(--fare);
+  }
+  .status-tariff.t2 {
+    background: rgba(0, 240, 255, 0.15);
+    color: var(--fare-cyan);
+  }
+
+  /* tariff-selector removed — now using btn-toggle in bottom bar */
+  /* tariff-card removed — now using btn-toggle in bottom bar */
+
+  /* ── Fare Table Card ── */
+  .table-card {
+    background: var(--surface);
+    border-radius: 14px;
+    border: 1px solid var(--card-border);
+    padding: 16px;
+    margin-top: 24px;
+  }
+  .table-card .title {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.8px;
+    color: var(--text-ter);
+    margin-bottom: 12px;
+  }
+  .table-card .title .ico { font-size: 12px; }
+  .chip-row {
+    display: flex; gap: 8px;
+    margin-bottom: 8px;
+  }
+  .chip-row:last-child { margin-bottom: 0; }
+  .chip {
+    flex: 1;
+    padding: 6px 8px;
+    border-radius: 8px;
+    text-align: center;
+    background: var(--card);
+    border: 1px solid var(--divider);
+  }
+  .chip .val {
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .chip .lab {
+    font-size: 11px;
+    color: var(--text-ter);
+    margin-top: 2px;
+  }
+  .chip.green { border-color: rgba(57, 255, 20, .3); }
+  .chip.cyan { border-color: rgba(0, 240, 255, .3); }
+  .chip.gold { border-color: rgba(255, 215, 0, .3); }
+  .chip.green .val { color: var(--fare); }
+  .chip.cyan .val { color: var(--fare-cyan); }
+  .chip.gold .val { color: var(--gold); }
+
+  /* ── Destination Bar ── */
+  .dest-bar {
+    padding: 6px 20px 0;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+  }
+  .dest-row {
+    display: flex;
+    align-items: center;
+    background: var(--surface);
+    border-radius: 14px;
+    border: 1px solid var(--card-border);
+    padding: 0 10px;
+  }
+  .dest-icon {
+    color: var(--text-ter);
+    font-size: 16px;
+    margin-right: 8px;
+  }
+  .dest-input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-size: 14px;
+    padding: 10px 0;
+    font-family: inherit;
+  }
+  .dest-suggestions {
+    background: var(--surface);
+    border-radius: 12px;
+    border: 1px solid var(--card-border);
+    margin-top: 4px;
+    max-height: 220px;
+    overflow-y: auto;
+    display: none;
+  }
+  .dest-suggestions.show {
+    display: block;
+  }
+  .dest-suggestions .item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-sec);
+    transition: background .15s;
+  }
+  .dest-suggestions .item:hover {
+    background: rgba(255,255,255,0.04);
+  }
+  .dest-suggestions .item:not(:last-child) {
+    border-bottom: 1px solid var(--divider);
+  }
+  .dest-suggestions .item .ico {
+    font-size: 14px;
+    color: var(--text-ter);
+    flex-shrink: 0;
+  }
+  .nav-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .nav-row .nav-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid rgba(57,255,20,0.3);
+    border-radius: 12px;
+    color: var(--fare);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    padding: 10px;
+    font-family: inherit;
+    transition: all .2s;
+  }
+  .nav-row .nav-btn:active { transform: scale(.97); }
+  .nav-row .nav-btn:hover { background: rgba(57,255,20,0.06); }
+
+  .btn-receipt {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 52px;
+    padding: 0 16px;
+    border-radius: 14px;
+    border: 1.5px solid var(--card-border);
+    background: var(--surface);
+    color: var(--text-ter);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all .2s;
+    flex-shrink: 0;
+  }
+  .btn-receipt:active { transform: scale(.97); }
+  .btn-receipt:hover { border-color: var(--gold); color: var(--gold); }
+
+  /* ── Receipt Modal ── */
+  .receipt-sheet {
+    max-width: 400px;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 16px;
+  }
+  .receipt-section {
+    margin-bottom: 12px;
+  }
+  .receipt-section h3 {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--gold);
+    margin: 0 0 6px;
+  }
+  .receipt-section .box {
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
+  .receipt-line {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+  }
+  .receipt-line .label {
+    font-size: 12px;
+    color: var(--text-ter);
+  }
+  .receipt-line .value {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+    text-align: right;
+    max-width: 60%;
+  }
+  .receipt-line.valor .value {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--fare);
+  }
+  .receipt-line.simple {
+    font-size: 13px;
+    color: var(--text);
+    padding: 2px 0;
+  }
+
+  /* ── Bottom Bar ── */
+  .bottombar {
+    padding: 10px 20px 14px;
+    border-top: 1px solid var(--divider);
+    flex-shrink: 0;
+  }
+  .bottombar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .btn-toggle {
+    min-width: 120px;
+    height: 52px;
+    border-radius: 14px;
+    border: 1.5px solid;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 14px;
+    transition: all .2s;
+    font-family: inherit;
+    flex-shrink: 0;
+  }
+  .btn-toggle:active { transform: scale(.95); }
+  .btn-toggle.t1 {
+    background: rgba(57, 255, 20, 0.12);
+    border-color: rgba(57, 255, 20, 0.4);
+  }
+  .btn-toggle.t2 {
+    background: rgba(0, 240, 255, 0.12);
+    border-color: rgba(0, 240, 255, 0.4);
+  }
+  .btn-toggle.t1 #toggleLabel { color: var(--fare); }
+  .btn-toggle.t2 #toggleLabel { color: var(--fare-cyan); }
+  .btn-toggle #toggleLabel {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  .toggle-arrow {
+    font-size: 12px;
+    opacity: 0.6;
+    color: var(--text-ter);
+  }
+  .btn-main {
+    flex: 1;
+    height: 52px;
+    border-radius: 14px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    transition: transform .15s, box-shadow .2s;
+    font-family: inherit;
+  }
+  .btn-main:active { transform: scale(.97); }
+  .btn-main.start {
+    background: var(--start);
+    color: #000;
+    box-shadow: 0 0 16px rgba(0, 230, 118, 0.2);
+  }
+  .btn-main.stop {
+    background: var(--stop);
+    color: #000;
+    box-shadow: 0 0 16px rgba(255, 23, 68, 0.2);
+  }
+  .btn-main .ico { font-size: 22px; }
+
+  /* ── History Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.85);
+    z-index: 100;
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-sheet {
+    width: 100%;
+    max-width: 480px;
+    max-height: 75vh;
+    background: var(--bg);
+    border-radius: 24px 24px 0 0;
+    padding: 20px;
+    overflow-y: auto;
+    animation: slideUp .3s ease;
+  }
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  .modal-sheet .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--divider);
+    margin-bottom: 16px;
+  }
+  .modal-sheet .header h2 {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--text-sec);
+  }
+  .modal-sheet .header button {
+    background: none; border: none;
+    color: var(--text-sec);
+    font-size: 22px;
+    cursor: pointer;
+    padding: 4px;
+  }
+  .history-item {
+    display: flex; align-items: center;
+    padding: 14px 16px;
+    background: var(--surface);
+    border-radius: 14px;
+    border: 1px solid var(--card-border);
+    margin-bottom: 8px;
+  }
+  .history-item .status-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .history-item .status-icon.done { background: rgba(57,255,20,.1); color: var(--fare); }
+  .history-item .status-icon.cancel { background: rgba(255,87,34,.1); color: var(--orange); }
+  .history-item .info {
+    margin-left: 14px;
+    flex: 1;
+  }
+  .history-item .info .value { font-size: 17px; font-weight: 500; }
+  .history-item .info .meta { font-size: 12px; color: var(--text-ter); margin-top: 3px; }
+  .history-item .info .date { font-size: 11px; color: var(--text-dim); margin-top: 1px; }
+  .history-item .arrow { color: var(--text-dim); font-size: 18px; }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 0;
+    color: var(--text-dim);
+  }
+  .empty-state .ico { font-size: 40px; margin-bottom: 12px; }
+  .empty-state p { font-size: 13px; color: var(--text-ter); letter-spacing: .5px; }
+  @keyframes spin { to { transform: rotate(360deg) } }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="icon-taxi">🚕</div>
+    <div class="brand">
+      <h1>TAXÍMETRO DIGITAL</h1>
+      <span>v1.0 · Inmetro nº 201/2002</span>
+    </div>
+    <div class="right">
+      <div class="gps-dot active" id="gpsIcon">📍</div>
+      <div class="btn-icon" id="driverBtn" onclick="abrirConfigMotorista()">👤</div>
+      <div class="btn-icon" onclick="openHistory()">📋</div>
+    </div>
+  </div>
+
+  <!-- DESTINATION BAR -->
+  <div class="dest-bar">
+    <div class="dest-row">
+      <span class="dest-icon">🔍</span>
+      <input type="text" id="destInput" placeholder="Digite o destino..." autocomplete="off" class="dest-input">
+    </div>
+    <div id="destSuggestions" class="dest-suggestions"></div>
+    <div id="navRow" class="nav-row" style="display:none">
+      <button class="nav-btn" onclick="navegarGoogle()">🗺️ Google Maps</button>
+      <button class="nav-btn" onclick="navegarWaze()">🧭 Waze</button>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+    <div class="spacer-1"></div>
+    <!-- Fare Display -->
+    <div class="fare-display idle" id="fareDisplay">
+      <div id="totalBadge" style="display:none; margin-bottom:8px;">
+        <span style="display:inline-block;padding:6px 20px;border-radius:20px;background:rgba(57,255,20,0.12);border:1px solid rgba(57,255,20,0.3);font-size:13px;font-weight:700;letter-spacing:1.5px;color:var(--fare)">TOTAL A PAGAR</span>
+      </div>
+      <div class="fare-row">
+        <span class="fare-currency" id="fareCurrency">R$</span>
+        <span class="fare-integer" id="fareInt">0</span>
+        <span class="fare-cents" id="fareCents">,00</span>
+      </div>
+      <div class="fare-underline idle" id="fareLine"></div>
+    </div>
+    <div class="spacer-1"></div>
+    <!-- Info Panel -->
+    <div class="info-panel">
+      <div class="info-item">
+        <div class="value" id="infoTempo">00:00:00</div>
+        <div class="label">TEMPO</div>
+      </div>
+      <div class="info-divider"></div>
+      <div class="info-item">
+        <div class="value" id="infoDist">0,00 km</div>
+        <div class="label">DISTÂNCIA</div>
+      </div>
+      <div class="info-divider"></div>
+      <div class="info-item">
+        <div class="value" id="infoFrac">0</div>
+        <div class="label">FRAÇÕES</div>
+      </div>
+    </div>
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <div class="status-dot idle" id="statusDot"></div>
+      <div class="status-text idle" id="statusText">AGUARDANDO CORRIDA</div>
+      <div class="status-tariff t1" id="statusTariff" style="display:none">B1</div>
+    </div>
+    <div class="spacer-1"></div>
+  </div>
+
+  <!-- BOTTOM BAR -->
+  <div class="bottombar" id="bottombar">
+    <div class="bottombar-row" id="bottomRowMain">
+      <button class="btn-main start" id="btnMain" onclick="toggleCorrida()">
+        <span class="ico">▶</span>
+        INICIAR CORRIDA
+      </button>
+      <button class="btn-toggle t1" id="btnToggle" onclick="toggleBandeira()">
+        <span id="toggleLabel">BANDEIRA 1</span>
+        <span class="toggle-arrow">⇄</span>
+      </button>
+    </div>
+    <div class="bottombar-row" id="bottomRowEnded" style="display:none">
+      <button class="btn-main start" id="btnMainEnded" onclick="toggleCorrida()">
+        <span class="ico">▶</span>
+        NOVA CORRIDA
+      </button>
+      <button class="btn-receipt" id="btnReceipt" onclick="mostrarRecibo()">
+        🧾 RECIBO
+      </button>
+    </div>
+  </div>
+  
+  <!-- RECEIPT MODAL -->
+  <div class="modal-overlay" id="receiptModal">
+    <div class="modal-sheet receipt-sheet" id="receiptContent"></div>
+  </div>
+</div>
+
+<!-- HISTORY MODAL -->
+<div class="modal-overlay" id="historyModal">
+  <div class="modal-sheet">
+    <div class="header">
+      <h2>HISTÓRICO DE CORRIDAS</h2>
+      <button onclick="closeHistory()">✕</button>
+    </div>
+    <div class="empty-state">
+      <div class="ico">📋</div>
+      <p>NENHUMA CORRIDA ENCONTRADA</p>
+    </div>
+    <div id="historyList"></div>
+  </div>
+</div>
+
+<script>
+  // ── State ──
+  const state = {
+    running: false,
+    tarifa: 1,
+    valor: 0,
+    distancia: 0,
+    fracoes: 0,
+    segundos: 0,
+    history: [],
+    timer: null,
+  };
+  let tripMeta = {
+    horaEmbarque: null,
+    horaDesembarque: null,
+    localEmbarque: null,
+    localDesembarque: null,
+  };
+  let driverConfig = {
+    nome: localStorage.getItem('driverNome') || '',
+    placa: localStorage.getItem('driverPlaca') || 'ABC-1234',
+    carro: localStorage.getItem('driverCarro') || 'Toyota Corolla',
+  };
+
+  const ft = { Ba: 6.76, f: 0.35, B1: 3.43, B2: 4.12, TH: 31.19 };
+  ft.i1 = (ft.f * 1000) / ft.B1;   // 102.04 m
+  ft.i2 = (ft.f * 1000) / ft.B2;   // 84.95 m
+  ft.iTH = (ft.f * 3600) / ft.TH;  // 40.4 s
+
+  let acumDist = 0;
+  let acumTempo = 0;
+
+  // ── DOM refs ──
+  const $ = id => document.getElementById(id);
+  const fareInt = $('fareInt');
+  const fareCents = $('fareCents');
+  const fareDisplay = $('fareDisplay');
+  const fareLine = $('fareLine');
+  const infoTempo = $('infoTempo');
+  const infoDist = $('infoDist');
+  const infoFrac = $('infoFrac');
+  const statusDot = $('statusDot');
+  const statusText = $('statusText');
+  const statusTariff = $('statusTariff');
+  const btnMain = $('btnMain');
+  const gpsIcon = $('gpsIcon');
+  const destInput = $('destInput');
+  const destSuggestions = $('destSuggestions');
+  const navRow = $('navRow');
+  const bottomRowMain = $('bottomRowMain');
+  const bottomRowEnded = $('bottomRowEnded');
+  const btnMainEnded = $('btnMainEnded');
+
+  // ── Autocomplete (Nominatim) ──
+  let destSelected = null;
+  let destDebounce = null;
+
+  async function buscarSugestoes(query) {
+    if (query.trim().length < 3) { destSuggestions.classList.remove('show'); return; }
+    try {
+      const url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&limit=5&accept-language=pt-BR';
+      const res = await fetch(url, { headers: { 'User-Agent': 'TaximetroDigital/1.0' } });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      if (destInput.value.trim() !== query) return;
+      destSuggestions.innerHTML = data.map(function(item) {
+        return '<div class="item" data-lat="' + item.lat + '" data-lon="' + item.lon + '" data-name="' + escapeHtml(item.display_name) + '">' +
+          '<span class="ico">📍</span>' +
+          '<span>' + escapeHtml(item.display_name.split(',').slice(0,3).join(',')) + '</span>' +
+          '</div>';
+      }).join('');
+      destSuggestions.classList.toggle('show', data.length > 0);
+    } catch(e) {
+      // CORS error when opened from file:// — silently fallback
+      destSuggestions.classList.remove('show');
+    }
+  }
+
+  function escapeHtml(s) {
+    var div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  destInput.addEventListener('input', function() {
+    destSelected = null;
+    clearTimeout(destDebounce);
+    destDebounce = setTimeout(function() { buscarSugestoes(destInput.value.trim()); }, 400);
+    atualizarNavRow();
+  });
+
+  destSuggestions.addEventListener('click', function(e) {
+    var item = e.target.closest('.item');
+    if (!item) return;
+    var name = item.dataset.name;
+    destSelected = { name: name, lat: item.dataset.lat, lon: item.dataset.lon };
+    destInput.value = name.split(',').slice(0, 2).join(',');
+    destSuggestions.classList.remove('show');
+    atualizarNavRow();
+  });
+
+  // Close suggestions on outside click
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.dest-bar')) destSuggestions.classList.remove('show');
+  });
+
+  // ── Navigate ──
+  function atualizarNavRow() {
+    var hasDest = destSelected !== null || destInput.value.trim().length >= 3;
+    navRow.style.display = hasDest ? 'flex' : 'none';
+  }
+
+  function getDestParam() {
+    if (destSelected) return destSelected.lat + ',' + destSelected.lon;
+    return destInput.value.trim();
+  }
+
+  function navegarGoogle() {
+    var dest = getDestParam();
+    if (!dest || dest.length < 3) return;
+    window.open('https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(dest) + '&travelmode=driving', '_blank');
+  }
+
+  function navegarWaze() {
+    var dest = getDestParam();
+    if (!dest || dest.length < 3) return;
+    window.open('https://www.waze.com/ul?q=' + encodeURIComponent(dest) + '&navigate=yes', '_blank');
+  }
+
+  // ── Update UI ──
+  function updateDisplay() {
+    const s = state.valor.toFixed(2);
+    const parts = s.split('.');
+    fareInt.textContent = parts[0];
+    fareCents.textContent = ',' + parts[1];
+
+    infoDist.textContent = (state.distancia / 1000).toFixed(2).replace('.', ',') + ' km';
+    infoFrac.textContent = state.fracoes;
+
+    const h = String(Math.floor(state.segundos / 3600)).padStart(2, '0');
+    const m = String(Math.floor((state.segundos % 3600) / 60)).padStart(2, '0');
+    const s_ = String(state.segundos % 60).padStart(2, '0');
+    infoTempo.textContent = h + ':' + m + ':';
+
+    // blink seconds
+    infoTempo.textContent = h + ':' + m + ':' + s_;
+  }
+
+  function setRunning(on, showTotal) {
+    state.running = on;
+    const ended = showTotal === true;
+
+    fareDisplay.className = 'fare-display' + (on || ended ? '' : ' idle');
+    fareLine.className = 'fare-underline' + (on || ended ? ' active' : ' idle');
+    if (ended) fareLine.style.background = 'var(--gold)';
+    else fareLine.style.background = '';
+
+    statusDot.className = 'status-dot ' + (on ? 'active' : ended ? 'active' : 'idle');
+    if (ended) statusDot.style.background = 'var(--gold)';
+    else statusDot.style.background = '';
+
+    statusText.className = 'status-text ' + (on ? 'active' : ended ? 'active' : 'idle');
+    statusText.textContent = on ? 'CORRIDA EM ANDAMENTO' : ended ? 'CORRIDA ENCERRADA' : 'AGUARDANDO CORRIDA';
+    if (ended) statusText.style.color = 'var(--gold)';
+    else statusText.style.color = '';
+
+    statusTariff.style.display = on ? 'block' : 'none';
+    gpsIcon.className = 'gps-dot active';
+
+    btnMain.className = 'btn-main ' + (on ? 'stop' : 'start');
+    btnMain.innerHTML = on
+      ? '<span class="ico">⏹</span> ENCERRAR CORRIDA'
+      : '<span class="ico">▶</span> INICIAR CORRIDA';
+
+    // Toggle bottom bar rows
+    bottomRowMain.style.display = on || !ended ? 'flex' : 'none';
+    bottomRowEnded.style.display = ended ? 'flex' : 'none';
+
+    if (!on && !ended) {
+      clearInterval(state.timer);
+      state.timer = null;
+    }
+  }
+
+  function showTotalBadge(show) {
+    const badge = document.getElementById('totalBadge');
+    badge.style.display = show ? 'block' : 'none';
+    const currency = document.getElementById('fareCurrency');
+    if (show) currency.style.color = 'var(--fare)';
+    else currency.style.color = '';
+  }
+
+  function selectTarifa(t) {
+    state.tarifa = t;
+    const btn = $('btnToggle');
+    btn.className = 'btn-toggle ' + (t === 1 ? 't1' : 't2');
+    $('toggleLabel').textContent = 'BANDEIRA ' + t;
+    if (state.running) {
+      statusTariff.className = 'status-tariff ' + (t === 1 ? 't1' : 't2');
+      statusTariff.textContent = 'B' + t;
+    }
+  }
+  function toggleBandeira() {
+    selectTarifa(state.tarifa === 1 ? 2 : 1);
+  }
+
+  // ── Core 1s tick (simulated) ──
+  function tick() {
+    if (!state.running) return;
+
+    // Simula ~5m percorridos (movimento) e pausas (parado)
+    // Primeiro 30s: movimento; depois 10s: parado; alterna
+    const ciclo = state.segundos % 40;
+    const emMovimento = ciclo < 30;
+    const velMediaMs = emMovimento ? 8.33 : 0.5; // ~30 km/h ou parado
+
+    state.segundos++;
+
+    if (velMediaMs < 0.83) {
+      // Parado
+      acumTempo += 1;
+      while (acumTempo >= ft.iTH) {
+        state.fracoes++;
+        acumTempo -= ft.iTH;
+      }
+    } else {
+      // Movimento: ~8.33 m/s * 1s = 8.33 m por tick
+      const d = velMediaMs * 1;
+      state.distancia += d;
+      acumDist += d;
+      acumTempo = 0;
+      const iAtivo = state.tarifa === 1 ? ft.i1 : ft.i2;
+      while (acumDist >= iAtivo) {
+        state.fracoes++;
+        acumDist -= iAtivo;
+      }
+    }
+
+    state.valor = ft.Ba + state.fracoes * ft.f;
+    updateDisplay();
+  }
+
+  // ── Main button ──
+  function toggleCorrida() {
+    if (state.running) {
+      clearInterval(state.timer);
+      state.timer = null;
+
+      // Salva no histórico
+      const now = new Date();
+      tripMeta.horaDesembarque = new Date();
+      tripMeta.localDesembarque = destInput.value.trim() || null;
+
+      state.history.unshift({
+        valor: state.valor,
+        dist: state.distancia,
+        fracoes: state.fracoes,
+        tarifa: state.tarifa,
+        status: 'done',
+        data: now.toISOString().substring(0, 19).replace('T', ' '),
+      });
+
+      // Mantém o valor final visível com badge "TOTAL A PAGAR"
+      setRunning(false, true);
+      updateDisplay();
+      showTotalBadge(true);
+    } else {
+      tripMeta.horaEmbarque = new Date();
+      tripMeta.horaDesembarque = null;
+      tripMeta.localEmbarque = destInput.value.trim() || null;
+      tripMeta.localDesembarque = null;
+
+      showTotalBadge(false);
+      statusText.style.color = '';
+      fareLine.style.background = '';
+      statusDot.style.background = '';
+      state.valor = ft.Ba + ft.f;
+      state.fracoes = 1;
+      state.segundos = 0;
+      acumDist = 0;
+      acumTempo = 0;
+      setRunning(true);
+      updateDisplay();
+      state.timer = setInterval(tick, 1000);
+    }
+  }
+
+  // ── Driver Config ──
+  function abrirConfigMotorista() {
+    var nome = prompt('Nome do motorista:', driverConfig.nome || '');
+    if (nome !== null) {
+      driverConfig.nome = nome.trim();
+      localStorage.setItem('driverNome', driverConfig.nome);
+    }
+  }
+
+  function fmtDatetime(d) {
+    if (!d) return '--';
+    var pad = function(n) { return String(n).padStart(2, '0'); };
+    return pad(d.getDate()) + '/' + pad(d.getMonth()+1) + '/' + d.getFullYear() + ' ' +
+      pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  // ── Receipt ──
+  function mostrarRecibo() {
+    var content = $('receiptContent');
+    var t = tripMeta;
+    content.innerHTML = '';
+    var html = '';
+
+    // Header
+    html += '<div style="text-align:center;margin-bottom:16px">';
+    html += '<div style="font-size:24px;margin-bottom:8px">🧾</div>';
+    html += '<h2 style="margin:0;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--text)">RECIBO DE CORRIDA</h2>';
+    html += '<p style="margin:4px 0 0;font-size:11px;color:var(--text-ter);letter-spacing:0.3px">TAXÍMETRO DIGITAL · Inmetro nº 201/2002</p>';
+    html += '</div>';
+
+    // Valor
+    html += '<div style="text-align:center;margin:16px 0 20px">';
+    html += '<div style="font-size:28px;font-weight:700;color:var(--fare)">R$ ' + state.valor.toFixed(2) + '</div>';
+    html += '</div>';
+
+    // Driver / Vehicle
+    html += '<div class="receipt-section"><h3>MOTORISTA</h3><div class="box">';
+    if (driverConfig.nome) html += '<div class="receipt-line simple">' + escapeHtml(driverConfig.nome) + '</div>';
+    html += '<div class="receipt-line simple">' + escapeHtml(driverConfig.carro) + ' · ' + escapeHtml(driverConfig.placa) + '</div>';
+    html += '</div></div>';
+
+    // Trip
+    html += '<div class="receipt-section"><h3>VIAGEM</h3><div class="box">';
+    var bandeiraNome = state.tarifa === 1 ? 'BANDEIRA 1' : 'BANDEIRA 2';
+    html += '<div class="receipt-line"><span class="label">Bandeira</span><span class="value">' + bandeiraNome + '</span></div>';
+    html += '<div class="receipt-line"><span class="label">Distância</span><span class="value">' + (state.distancia/1000).toFixed(2) + ' km</span></div>';
+    html += '<div class="receipt-line"><span class="label">Frações</span><span class="value">' + state.fracoes + '</span></div>';
+    html += '<div class="receipt-line"><span class="label">Tempo</span><span class="value">' + infoTempo.textContent + '</span></div>';
+    html += '</div></div>';
+
+    // Boarding
+    html += '<div class="receipt-section"><h3>EMBARQUE</h3><div class="box">';
+    html += '<div class="receipt-line"><span class="label">Horário</span><span class="value">' + fmtDatetime(t.horaEmbarque) + '</span></div>';
+    if (t.localEmbarque) html += '<div class="receipt-line"><span class="label">Local</span><span class="value">' + escapeHtml(t.localEmbarque) + '</span></div>';
+    html += '</div></div>';
+
+    // Disembarkation
+    html += '<div class="receipt-section"><h3>DESEMBARQUE</h3><div class="box">';
+    html += '<div class="receipt-line"><span class="label">Horário</span><span class="value">' + fmtDatetime(t.horaDesembarque) + '</span></div>';
+    if (t.localDesembarque) html += '<div class="receipt-line"><span class="label">Local</span><span class="value">' + escapeHtml(t.localDesembarque) + '</span></div>';
+    html += '</div></div>';
+
+    // Action buttons
+    html += '<div style="margin-top:20px">';
+    html += '<div style="display:flex;gap:8px;margin-bottom:8px">';
+    html += '<button onclick="imprimirRecibo()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px;border-radius:14px;border:1px solid var(--card-border);background:var(--surface2);color:var(--text-sec);font-size:12px;font-weight:600;letter-spacing:0.5px;cursor:pointer;font-family:inherit">🖨️ IMPRIMIR</button>';
+    html += '<button onclick="enviarWhatsAppRecibo()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px;border-radius:14px;border:1px solid var(--card-border);background:var(--surface2);color:#25D366;font-size:12px;font-weight:600;letter-spacing:0.5px;cursor:pointer;font-family:inherit">💬 WHATSAPP</button>';
+    html += '</div>';
+    html += '<button onclick="$(\'receiptModal\').classList.remove(\'open\')" style="width:100%;padding:12px;border-radius:14px;border:1px solid var(--card-border);background:var(--surface2);color:var(--text-ter);font-size:13px;font-weight:600;letter-spacing:1px;cursor:pointer;font-family:inherit">FECHAR</button>';
+    html += '</div>';
+
+    content.innerHTML = html;
+    $('receiptModal').classList.add('open');
+  }
+
+  function textoRecibo() {
+    var t = tripMeta;
+    var lines = [];
+    lines.push('🧾 *RECIBO DE CORRIDA*');
+    lines.push('TAXÍMETRO DIGITAL · Inmetro nº 201/2002');
+    lines.push('');
+    lines.push('*VALOR:* R$ ' + state.valor.toFixed(2));
+    lines.push('');
+    if (driverConfig.nome) {
+      lines.push('*MOTORISTA*');
+      lines.push(driverConfig.nome);
+    }
+    lines.push(driverConfig.carro + ' · ' + driverConfig.placa);
+    lines.push('');
+    lines.push('*VIAGEM*');
+    lines.push('Bandeira: ' + (state.tarifa === 1 ? 'BANDEIRA 1' : 'BANDEIRA 2'));
+    lines.push('Distância: ' + (state.distancia/1000).toFixed(2) + ' km');
+    lines.push('Frações: ' + state.fracoes);
+    lines.push('Tempo: ' + infoTempo.textContent);
+    lines.push('');
+    lines.push('*EMBARQUE*');
+    lines.push('Horário: ' + fmtDatetime(t.horaEmbarque));
+    if (t.localEmbarque) lines.push('Local: ' + t.localEmbarque);
+    lines.push('');
+    lines.push('*DESEMBARQUE*');
+    lines.push('Horário: ' + fmtDatetime(t.horaDesembarque));
+    if (t.localDesembarque) lines.push('Local: ' + t.localDesembarque);
+    return lines.join('\n');
+  }
+
+  function imprimirRecibo() {
+    var win = window.open('', '_blank');
+    win.document.write('<html><head><title>Recibo de Corrida</title>');
+    win.document.write('<style>body{font-family:sans-serif;padding:32px;color:#222}');
+    win.document.write('.val{font-size:28px;font-weight:bold;color:#2e7d32;text-align:center}');
+    win.document.write('h3{color:#b8860b;font-size:11px;letter-spacing:1px;margin:16px 0 4px}');
+    win.document.write('.box{background:#f5f5f5;border-radius:8px;padding:10px;margin-bottom:4px}');
+    win.document.write('.l{display:flex;justify-content:space-between;padding:2px 0;font-size:13px}');
+    win.document.write('.lb{color:#888}.sim{font-size:13px}');
+    win.document.write('@media print{body{padding:16px}}');
+    win.document.write('</style></head><body>');
+    win.document.write('<div style="text-align:center;margin-bottom:16px">');
+    win.document.write('<h1 style="font-size:18px;margin:0">RECIBO DE CORRIDA</h1>');
+    win.document.write('<p style="font-size:10px;color:#888;margin:4px 0">TAXÍMETRO DIGITAL · Inmetro nº 201/2002</p>');
+    win.document.write('</div>');
+    win.document.write('<div class="val">R$ ' + state.valor.toFixed(2) + '</div>');
+
+    // Driver
+    win.document.write('<h3>MOTORISTA</h3><div class="box">');
+    if (driverConfig.nome) win.document.write('<div class="sim">' + escapeHtml(driverConfig.nome) + '</div>');
+    win.document.write('<div class="sim">' + escapeHtml(driverConfig.carro) + ' · ' + escapeHtml(driverConfig.placa) + '</div>');
+    win.document.write('</div>');
+
+    var t = tripMeta;
+    // Trip
+    win.document.write('<h3>VIAGEM</h3><div class="box">');
+    win.document.write('<div class="l"><span class="lb">Bandeira</span><span>' + (state.tarifa === 1 ? 'BANDEIRA 1' : 'BANDEIRA 2') + '</span></div>');
+    win.document.write('<div class="l"><span class="lb">Distância</span><span>' + (state.distancia/1000).toFixed(2) + ' km</span></div>');
+    win.document.write('<div class="l"><span class="lb">Frações</span><span>' + state.fracoes + '</span></div>');
+    win.document.write('<div class="l"><span class="lb">Tempo</span><span>' + infoTempo.textContent + '</span></div>');
+    win.document.write('</div>');
+
+    // Boarding
+    win.document.write('<h3>EMBARQUE</h3><div class="box">');
+    win.document.write('<div class="l"><span class="lb">Horário</span><span>' + fmtDatetime(t.horaEmbarque) + '</span></div>');
+    if (t.localEmbarque) win.document.write('<div class="l"><span class="lb">Local</span><span>' + escapeHtml(t.localEmbarque) + '</span></div>');
+    win.document.write('</div>');
+
+    // Disembarkation
+    win.document.write('<h3>DESEMBARQUE</h3><div class="box">');
+    win.document.write('<div class="l"><span class="lb">Horário</span><span>' + fmtDatetime(t.horaDesembarque) + '</span></div>');
+    if (t.localDesembarque) win.document.write('<div class="l"><span class="lb">Local</span><span>' + escapeHtml(t.localDesembarque) + '</span></div>');
+    win.document.write('</div>');
+
+    win.document.write('</body></html>');
+    win.document.close();
+    win.print();
+  }
+
+  function enviarWhatsAppRecibo() {
+    var numero = prompt('Número do cliente (com DDD):\nEx: 5511999999999', '55');
+    if (!numero) return;
+    numero = numero.replace(/[^\d]/g, '');
+    if (numero.length < 10) { alert('Número inválido. Digite com código do país. Ex: 5511999999999'); return; }
+    var texto = encodeURIComponent(textoRecibo());
+    window.open('https://wa.me/' + numero + '?text=' + texto, '_blank');
+  }
+
+  // ── History ──
+  function openHistory() {
+    const modal = $('historyModal');
+    const list = $('historyList');
+    const empty = modal.querySelector('.empty-state');
+
+    if (state.history.length === 0) {
+      empty.style.display = 'block';
+      list.innerHTML = '';
+    } else {
+      empty.style.display = 'none';
+      list.innerHTML = state.history.map(h => `
+        <div class="history-item">
+          <div class="status-icon done">✓</div>
+          <div class="info">
+            <div class="value">R$ ${h.valor.toFixed(2)}</div>
+            <div class="meta">${(h.dist/1000).toFixed(2)} km · ${h.fracoes} frações</div>
+            <div class="date">${h.data}</div>
+          </div>
+          <div class="arrow">›</div>
+        </div>
+      `).join('');
+    }
+    modal.classList.add('open');
+  }
+
+  function closeHistory() {
+    $('historyModal').classList.remove('open');
+  }
+
+  // Close modals on overlay click
+  $('historyModal').addEventListener('click', function(e) {
+    if (e.target === this) closeHistory();
+  });
+  $('receiptModal').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('open');
+  });
+
+  // Keyboard shortcut: Space to toggle
+  document.addEventListener('keydown', function(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      toggleCorrida();
+    }
+  });
+
+  // Init — auto-selecta bandeira pelo horário
+  const h = new Date().getHours();
+  selectTarifa(h >= 7 && h < 20 ? 1 : 2);
+  updateDisplay();
+</script>
+</body>
+</html>

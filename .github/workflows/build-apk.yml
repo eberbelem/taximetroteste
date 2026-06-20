@@ -1,0 +1,41 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.29'
+
+      - name: Setup Flutter project with scaffold
+        run: |
+          cd /tmp
+          flutter create --project-name taximetro --org com.taximetro taximetro
+          cp -r "$GITHUB_WORKSPACE"/lib /tmp/taximetro/
+          cp -r "$GITHUB_WORKSPACE"/test /tmp/taximetro/
+          cp "$GITHUB_WORKSPACE"/pubspec.yaml /tmp/taximetro/
+          cp "$GITHUB_WORKSPACE"/analysis_options.yaml /tmp/taximetro/
+          cp -r "$GITHUB_WORKSPACE"/android/app/src /tmp/taximetro/android/app/src
+          mkdir -p /tmp/taximetro/android/app
+          echo '{"project_info":{"project_id":"taximetro-stub"},"client":[{"client_info":{"mobilesdk_app_id":"1:000000000000:android:0000000000000000","android_client_info":{"package_name":"com.taximetro.app"}},"api_key":[{"current_key":"AIzaSyStub000000000000000000000000000000000"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}]}' > /tmp/taximetro/android/app/google-services.json
+
+      - name: Get dependencies
+        run: flutter pub get
+        working-directory: /tmp/taximetro
+
+      - name: Build debug APK
+        run: flutter build apk --debug --target-platform android-arm,android-arm64
+        working-directory: /tmp/taximetro
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: taximetro-debug-apk
+          path: /tmp/taximetro/build/app/outputs/flutter-apk/*.apk

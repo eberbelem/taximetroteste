@@ -1,0 +1,45 @@
+name: taximetro
+description: Taxímetro digital de alta precisão para frotas de veículos elétricos.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Localização de alta precisão com foreground service
+  geolocator: ^12.0.0
+  # Sensores de movimento (acelerômetro para detectar imobilidade)
+  sensors_plus: ^6.0.0
+  # Banco local SQLite (offline-first)
+  sqflite: ^2.3.0
+  path_provider: ^2.1.0
+  path: ^1.8.0
+  # Gerenciamento de foreground service
+  flutter_background_service: ^5.0.0
+  # Notificações para o foreground service persistente
+  flutter_local_notifications: ^18.0.0
+  # Sincronização com nuvem (opcional)
+  cloud_firestore: ^5.0.0
+  firebase_core: ^3.0.0
+  # Gerenciamento de estado
+  provider: ^6.1.0
+  # Permissões
+  permission_handler: ^11.0.0
+  # HTTP client para API de geocoding
+  http: ^1.2.0
+  # Abrir URLs (Google Maps / Waze)
+  url_launcher: ^6.3.0
+  # Impressão de recibos
+  printing: ^5.13.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
